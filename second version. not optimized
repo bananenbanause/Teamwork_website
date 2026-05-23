@@ -1,0 +1,935 @@
+import { useState, useRef } from "react";
+
+const COLORS = {
+  bg: "#0f1117",
+  surface: "#181c27",
+  surfaceHover: "#1e2333",
+  border: "#252b3d",
+  accent: "#4f8ef7",
+  accentSoft: "#1a2a4a",
+  accentGlow: "rgba(79,142,247,0.15)",
+  success: "#2ecc71",
+  successSoft: "#0d2e1a",
+  warning: "#f7c74f",
+  warningSoft: "#2e2600",
+  danger: "#e74c3c",
+  textPrimary: "#e8eaf0",
+  textSecondary: "#8892a4",
+  textMuted: "#4f5870",
+};
+
+const USERS = [
+  { id: 1, name: "Anna Müller", role: "Projektleiterin", avatar: "AM", color: "#4f8ef7" },
+  { id: 2, name: "Ben Schreiber", role: "Entwickler", avatar: "BS", color: "#2ecc71" },
+  { id: 3, name: "Clara Voigt", role: "Designerin", avatar: "CV", color: "#e07cf7" },
+  { id: 4, name: "David Koch", role: "Analyst", avatar: "DK", color: "#f7c74f" },
+];
+
+const CREDENTIALS = { anna: "1234", ben: "1234", clara: "1234", david: "1234" };
+
+const INITIAL_TASKS = [
+  { id: 1, label: "Konzept & Planung", progress: 100, owner: "Anna Müller" },
+  { id: 2, label: "Backend-Entwicklung", progress: 72, owner: "Ben Schreiber" },
+  { id: 3, label: "UI/UX Design", progress: 85, owner: "Clara Voigt" },
+  { id: 4, label: "Datenanalyse", progress: 40, owner: "David Koch" },
+  { id: 5, label: "Testing & QA", progress: 20, owner: "Ben Schreiber" },
+];
+
+const INITIAL_POSTS = [
+  {
+    id: 1, userId: 1, type: "update",
+    content: "Meilenstein erreicht! Konzeptphase erfolgreich abgeschlossen. Wir können jetzt in die Umsetzung starten. 🎉",
+    timestamp: "2025-05-20T09:14:00", comments: [
+      { id: 1, userId: 2, text: "Super Arbeit, Anna! Ich starte direkt mit dem Backend.", timestamp: "2025-05-20T09:45:00" },
+      { id: 2, userId: 3, text: "Klasse Neuigkeit! Die Designs sind fast fertig.", timestamp: "2025-05-20T10:02:00" },
+    ], likes: [2, 3, 4],
+  },
+  {
+    id: 2, userId: 3, type: "image",
+    content: "Erster Entwurf für das Dashboard-Layout. Feedback erwünscht!",
+    mediaLabel: "dashboard-mockup.png",
+    mediaColor: "#2a1a3e",
+    timestamp: "2025-05-21T14:30:00", comments: [
+      { id: 1, userId: 1, text: "Sieht sehr modern aus! Ich würde die Navigation etwas kompakter machen.", timestamp: "2025-05-21T15:10:00" },
+    ], likes: [1, 2],
+  },
+];
+
+const INITIAL_MEDIA = [
+  { id: 1, type: "image", name: "Dashboard-Mockup", uploader: 3, bg: "#1e1230", emoji: "🖼️", comments: ["Sieht toll aus!", "Farben passen gut."], likes: [1, 2] },
+  { id: 2, type: "video", name: "Demo-Walkthrough.mp4", uploader: 2, bg: "#0d2010", emoji: "🎬", comments: ["Sehr anschaulich erklärt."], likes: [1] },
+  { id: 3, type: "image", name: "Wireframe-Übersicht", uploader: 3, bg: "#12151e", emoji: "🖼️", comments: [], likes: [3, 4] },
+  { id: 4, type: "image", name: "Team-Foto Sprint 1", uploader: 1, bg: "#1a1410", emoji: "📸", comments: ["Schönes Foto!"], likes: [2, 3, 4] },
+];
+
+const INITIAL_FILES = [
+  { id: 1, name: "Projektkonzept_v2.pdf", size: "1.4 MB", type: "pdf", uploadedBy: 1, date: "2025-05-18" },
+  { id: 2, name: "Design-Assets.zip", size: "34 MB", type: "zip", uploadedBy: 3, date: "2025-05-21" },
+  { id: 3, name: "API-Dokumentation.docx", size: "540 KB", type: "doc", uploadedBy: 2, date: "2025-05-22" },
+  { id: 4, name: "Analysebericht_Q1.xlsx", size: "210 KB", type: "xls", uploadedBy: 4, date: "2025-05-19" },
+];
+
+const INITIAL_CHAT = [
+  { id: 1, userId: 1, text: "Hallo Team! Willkommen im ProjektHub-Chat.", timestamp: "2025-05-22T10:00:00" },
+  { id: 2, userId: 2, text: "Moin! Der Chat läuft ja super flüssig.", timestamp: "2025-05-22T10:02:00" },
+];
+
+const BOT_RESPONSES = [
+  { userId: 2, text: "Das klingt nach einem guten Plan. Ich schaue mir das im Code an!" },
+  { userId: 3, text: "Ich passe das UI-Design direkt im Figma-File an." },
+  { userId: 4, text: "Die Daten dazu decken sich mit unserem Q1-Bericht. Gute Arbeit!" },
+  { userId: 1, text: "Klasse! Lasst uns dazu morgen im Daily kurz abstimmen." },
+];
+
+function Avatar({ user, size = 36 }) {
+  if (!user) return null;
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: "50%",
+      background: user.color + "33", border: `2px solid ${user.color}55`,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      color: user.color, fontWeight: 700, fontSize: size * 0.35,
+      fontFamily: "'DM Sans', sans-serif", flexShrink: 0,
+    }}>{user.avatar}</div>
+  );
+}
+
+function ProgressBar({ value, color = COLORS.accent, thin = false }) {
+  return (
+    <div style={{ background: COLORS.border, borderRadius: 99, height: thin ? 4 : 8, overflow: "hidden" }}>
+      <div style={{
+        width: `${value}%`, height: "100%", borderRadius: 99,
+        background: `linear-gradient(90deg, ${color}bb, ${color})`,
+        boxShadow: `0 0 8px ${color}66`,
+        transition: "width 0.8s cubic-bezier(.4,0,.2,1)",
+      }} />
+    </div>
+  );
+}
+
+function FileIcon({ type }) {
+  const map = {
+    pdf: { icon: "📄", color: "#e74c3c" },
+    zip: { icon: "📦", color: "#f7c74f" },
+    doc: { icon: "📝", color: "#4f8ef7" },
+    xls: { icon: "📊", color: "#2ecc71" },
+    img: { icon: "🖼️", color: "#e07cf7" },
+    vid: { icon: "🎬", color: "#f7924f" },
+  };
+  const { icon, color } = map[type] || { icon: "📎", color: COLORS.textSecondary };
+  return <span style={{ fontSize: 22, filter: `drop-shadow(0 0 4px ${color}88)` }}>{icon}</span>;
+}
+
+function Tag({ label, color }) {
+  return (
+    <span style={{
+      padding: "2px 10px", borderRadius: 99, fontSize: 11, fontWeight: 600,
+      background: color + "22", color: color, border: `1px solid ${color}44`,
+      fontFamily: "'DM Mono', monospace", letterSpacing: "0.04em",
+    }}>{label}</span>
+  );
+}
+
+function formatTime(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString("de-DE", { day: "2-digit", month: "short" }) + " · " +
+    d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+}
+
+// ─── LOGIN ────────────────────────────────────────────────────────────────────
+function LoginPage({ onLogin }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  function handleLogin() {
+    setLoading(true);
+    setTimeout(() => {
+      const key = username.trim().toLowerCase();
+      if (CREDENTIALS[key] && CREDENTIALS[key] === password) {
+        const userMap = { anna: 1, ben: 2, clara: 3, david: 4 };
+        onLogin(USERS[userMap[key] - 1]);
+      } else {
+        setError("Ungültige Anmeldedaten. Versuche: anna / 1234");
+        setLoading(false);
+      }
+    }, 700);
+  }
+
+  return (
+    <div style={{
+      minHeight: "100vh", background: COLORS.bg, display: "flex",
+      alignItems: "center", justifyContent: "center",
+      fontFamily: "'DM Sans', sans-serif",
+    }}>
+      <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
+        <div style={{
+          position: "absolute", top: "20%", left: "50%", transform: "translateX(-50%)",
+          width: 600, height: 600, borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(79,142,247,0.08) 0%, transparent 70%)",
+        }} />
+      </div>
+
+      <div style={{
+        width: 400, background: COLORS.surface, border: `1px solid ${COLORS.border}`,
+        borderRadius: 20, padding: 40, position: "relative",
+        boxShadow: `0 24px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(79,142,247,0.08)`,
+      }}>
+        <div style={{ textAlign: "center", marginBottom: 36 }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: 16,
+            background: `linear-gradient(135deg, ${COLORS.accent}, #7b4ff7)`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 26, margin: "0 auto 16px", boxShadow: `0 8px 24px ${COLORS.accent}44`,
+          }}>⬡</div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: COLORS.textPrimary, letterSpacing: "-0.03em" }}>
+            Projekt<span style={{ color: COLORS.accent }}>Hub</span>
+          </div>
+          <div style={{ color: COLORS.textSecondary, fontSize: 13, marginTop: 6 }}>
+            Melde dich an, um auf dein Team-Dashboard zuzugreifen
+          </div>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <input
+            placeholder="Benutzername"
+            value={username}
+            onChange={e => setUsername(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && handleLogin()}
+            style={{
+              background: COLORS.bg, border: `1px solid ${COLORS.border}`,
+              borderRadius: 10, padding: "12px 16px", color: COLORS.textPrimary,
+              fontSize: 14, outline: "none", fontFamily: "'DM Sans', sans-serif",
+            }}
+          />
+          <input
+            type="password"
+            placeholder="Passwort"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && handleLogin()}
+            style={{
+              background: COLORS.bg, border: `1px solid ${COLORS.border}`,
+              borderRadius: 10, padding: "12px 16px", color: COLORS.textPrimary,
+              fontSize: 14, outline: "none", fontFamily: "'DM Sans', sans-serif",
+            }}
+          />
+          {error && <div style={{ color: COLORS.danger, fontSize: 12, padding: "8px 12px", background: "#e74c3c11", borderRadius: 8 }}>{error}</div>}
+          <button
+            onClick={handleLogin}
+            style={{
+              background: `linear-gradient(135deg, ${COLORS.accent}, #5a6ff7)`,
+              color: "#fff", border: "none", borderRadius: 10,
+              padding: "13px", fontSize: 14, fontWeight: 700,
+              cursor: loading ? "wait" : "pointer",
+              fontFamily: "'DM Sans', sans-serif",
+              boxShadow: `0 4px 16px ${COLORS.accent}44`,
+              opacity: loading ? 0.7 : 1,
+            }}
+          >{loading ? "Anmelden…" : "Anmelden"}</button>
+        </div>
+
+        <div style={{ marginTop: 20, padding: "12px 14px", background: COLORS.accentSoft, borderRadius: 10, fontSize: 12, color: COLORS.textSecondary }}>
+          <strong style={{ color: COLORS.accent }}>Demo-Zugänge:</strong> anna, ben, clara oder david · Passwort: <code style={{ color: COLORS.textPrimary }}>1234</code>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── SIDEBAR ──────────────────────────────────────────────────────────────────
+function Sidebar({ active, setActive, currentUser, onLogout }) {
+  const nav = [
+    { id: "dashboard", icon: "◈", label: "Dashboard" },
+    { id: "feed", icon: "◎", label: "Neuigkeiten" },
+    { id: "chat", icon: "💬", label: "Team-Chat" },
+    { id: "media", icon: "◫", label: "Medien" },
+    { id: "files", icon: "◧", label: "Dateien" },
+  ];
+  return (
+    <div style={{
+      width: 220, background: COLORS.surface, borderRight: `1px solid ${COLORS.border}`,
+      display: "flex", flexDirection: "column", height: "100vh", position: "sticky", top: 0,
+      fontFamily: "'DM Sans', sans-serif",
+    }}>
+      <div style={{ padding: "24px 20px 20px", borderBottom: `1px solid ${COLORS.border}` }}>
+        <div style={{ fontSize: 20, fontWeight: 800, color: COLORS.textPrimary, letterSpacing: "-0.03em" }}>
+          Projekt<span style={{ color: COLORS.accent }}>Hub</span>
+        </div>
+        <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2, fontFamily: "'DM Mono', monospace" }}>ALPHA · TEAM</div>
+      </div>
+
+      <nav style={{ flex: 1, padding: "16px 12px", display: "flex", flexDirection: "column", gap: 4 }}>
+        {nav.map(item => (
+          <button key={item.id} onClick={() => setActive(item.id)}
+            style={{
+              display: "flex", alignItems: "center", gap: 12,
+              padding: "10px 14px", borderRadius: 10, border: "none",
+              background: active === item.id ? COLORS.accentSoft : "transparent",
+              color: active === item.id ? COLORS.accent : COLORS.textSecondary,
+              fontSize: 14, fontWeight: active === item.id ? 600 : 400,
+              cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+              transition: "all 0.15s",
+            }}>
+            <span style={{ fontSize: 18, width: 20, textAlign: "center" }}>{item.icon}</span>
+            {item.label}
+          </button>
+        ))}
+      </nav>
+
+      <div style={{ padding: "16px 16px 20px", borderTop: `1px solid ${COLORS.border}` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+          <Avatar user={currentUser} size={34} />
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.textPrimary }}>{currentUser.name}</div>
+            <div style={{ fontSize: 11, color: COLORS.textMuted }}>{currentUser.role}</div>
+          </div>
+        </div>
+        <button onClick={onLogout} style={{
+          width: "100%", padding: "8px", borderRadius: 8, border: `1px solid ${COLORS.border}`,
+          background: "transparent", color: COLORS.textMuted, fontSize: 12, cursor: "pointer",
+          fontFamily: "'DM Sans', sans-serif",
+        }}>Abmelden</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── DASHBOARD ────────────────────────────────────────────────────────────────
+function Dashboard({ tasks }) {
+  const overall = Math.round(tasks.reduce((s, t) => s + t.progress, 0) / tasks.length);
+  const overallColor = overall >= 75 ? COLORS.success : overall >= 40 ? COLORS.warning : COLORS.danger;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+      <div>
+        <h1 style={{ fontSize: 26, fontWeight: 800, color: COLORS.textPrimary, margin: 0, letterSpacing: "-0.03em" }}>Dashboard</h1>
+        <p style={{ color: COLORS.textSecondary, margin: "4px 0 0", fontSize: 14 }}>Projektüberblick & aktueller Status</p>
+      </div>
+
+      <div style={{
+        background: COLORS.surface, borderRadius: 16, border: `1px solid ${COLORS.border}`,
+        padding: 28, position: "relative", overflow: "hidden",
+      }}>
+        <div style={{
+          position: "absolute", top: -30, right: -30, width: 160, height: 160, borderRadius: "50%",
+          background: `radial-gradient(circle, ${overallColor}18 0%, transparent 70%)`,
+        }} />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+          <div>
+            <div style={{ fontSize: 13, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em" }}>GESAMTFORTSCHRITT</div>
+            <div style={{ fontSize: 44, fontWeight: 900, color: overallColor, letterSpacing: "-0.04em", lineHeight: 1.1, marginTop: 4 }}>
+              {overall}<span style={{ fontSize: 24 }}>%</span>
+            </div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <Tag label={overall >= 75 ? "IM PLAN" : overall >= 40 ? "IN ARBEIT" : "VERZÖGERUNG"} color={overallColor} />
+            <div style={{ fontSize: 12, color: COLORS.textSecondary, marginTop: 8 }}>{tasks.length} aktive Aufgabenbereiche</div>
+          </div>
+        </div>
+        <ProgressBar value={overall} color={overallColor} />
+      </div>
+
+      <div style={{ background: COLORS.surface, borderRadius: 16, border: `1px solid ${COLORS.border}`, padding: 24 }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.textPrimary, marginBottom: 20 }}>Aufgabenbereiche</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+          {tasks.map(task => {
+            const c = task.progress >= 80 ? COLORS.success : task.progress >= 50 ? COLORS.accent : task.progress >= 25 ? COLORS.warning : COLORS.danger;
+            return (
+              <div key={task.id}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <div>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: COLORS.textPrimary }}>{task.label}</span>
+                    <span style={{ fontSize: 12, color: COLORS.textMuted, marginLeft: 10 }}>{task.owner}</span>
+                  </div>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: c, fontFamily: "'DM Mono', monospace" }}>{task.progress}%</span>
+                </div>
+                <ProgressBar value={task.progress} color={c} thin />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={{ background: COLORS.surface, borderRadius: 16, border: `1px solid ${COLORS.border}`, padding: 24 }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.textPrimary, marginBottom: 18 }}>Team</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          {USERS.map(u => (
+            <div key={u.id} style={{
+              display: "flex", alignItems: "center", gap: 12,
+              padding: "12px 14px", borderRadius: 12, border: `1px solid ${COLORS.border}`,
+              background: COLORS.bg,
+            }}>
+              <Avatar user={u} size={38} />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.textPrimary }}>{u.name}</div>
+                <div style={{ fontSize: 11, color: COLORS.textMuted }}>{u.role}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── FEED ─────────────────────────────────────────────────────────────────────
+function Feed({ posts, setPosts, currentUser }) {
+  const [newText, setNewText] = useState("");
+  const [commentTexts, setCommentTexts] = useState({});
+  const [openComment, setOpenComment] = useState(null);
+
+  function addPost() {
+    if (!newText.trim()) return;
+    setPosts(prev => [{
+      id: Date.now(), userId: currentUser.id, type: "update",
+      content: newText.trim(), timestamp: new Date().toISOString(),
+      comments: [], likes: [],
+    }, ...prev]);
+    setNewText("");
+  }
+
+  function toggleLike(postId) {
+    setPosts(prev => prev.map(p => {
+      if (p.id !== postId) return p;
+      const liked = p.likes.includes(currentUser.id);
+      return { ...p, likes: liked ? p.likes.filter(id => id !== currentUser.id) : [...p.likes, currentUser.id] };
+    }));
+  }
+
+  function addComment(postId) {
+    const text = (commentTexts[postId] || "").trim();
+    if (!text) return;
+    setPosts(prev => prev.map(p => p.id !== postId ? p : {
+      ...p, comments: [...p.comments, {
+        id: Date.now(), userId: currentUser.id, text,
+        timestamp: new Date().toISOString(),
+      }],
+    }));
+    setCommentTexts(t => ({ ...t, [postId]: "" }));
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      <div>
+        <h1 style={{ fontSize: 26, fontWeight: 800, color: COLORS.textPrimary, margin: 0, letterSpacing: "-0.03em" }}>Neuigkeiten</h1>
+        <p style={{ color: COLORS.textSecondary, margin: "4px 0 0", fontSize: 14 }}>Team-Updates und Projektfortschritte</p>
+      </div>
+
+      <div style={{ background: COLORS.surface, borderRadius: 16, border: `1px solid ${COLORS.border}`, padding: 20 }}>
+        <div style={{ display: "flex", gap: 12 }}>
+          <Avatar user={currentUser} size={36} />
+          <div style={{ flex: 1 }}>
+            <textarea
+              placeholder="Was gibt es Neues zum Projekt?"
+              value={newText}
+              onChange={e => setNewText(e.target.value)}
+              rows={3}
+              style={{
+                width: "100%", background: COLORS.bg, border: `1px solid ${COLORS.border}`,
+                borderRadius: 10, padding: "10px 14px", color: COLORS.textPrimary,
+                fontSize: 14, outline: "none", resize: "none", boxSizing: "border-box",
+                fontFamily: "'DM Sans', sans-serif",
+              }}
+            />
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
+              <button onClick={addPost} style={{
+                background: `linear-gradient(135deg, ${COLORS.accent}, #5a6ff7)`,
+                color: "#fff", border: "none", borderRadius: 8,
+                padding: "8px 20px", fontSize: 13, fontWeight: 600,
+                cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+              }}>Veröffentlichen</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {posts.map(post => {
+        const author = USERS.find(u => u.id === post.userId);
+        const liked = post.likes.includes(currentUser.id);
+        return (
+          <div key={post.id} style={{
+            background: COLORS.surface, borderRadius: 16, border: `1px solid ${COLORS.border}`, overflow: "hidden",
+          }}>
+            <div style={{ padding: 20 }}>
+              <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                <Avatar user={author} size={38} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                    <span style={{ fontWeight: 700, fontSize: 14, color: COLORS.textPrimary }}>{author?.name}</span>
+                    <Tag label={author?.role} color={author?.color} />
+                    <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: "auto", fontFamily: "'DM Mono', monospace" }}>{formatTime(post.timestamp)}</span>
+                  </div>
+                  <p style={{ margin: "10px 0 0", color: COLORS.textPrimary, fontSize: 14, lineHeight: 1.6 }}>{post.content}</p>
+
+                  {post.type === "image" && (
+                    <div style={{
+                      marginTop: 14, borderRadius: 10, height: 180,
+                      background: `linear-gradient(135deg, ${post.mediaColor || "#1a2a4a"}, ${COLORS.bg})`,
+                      border: `1px solid ${COLORS.border}`, display: "flex",
+                      alignItems: "center", justifyContent: "center",
+                      flexDirection: "column", gap: 8,
+                    }}>
+                      <span style={{ fontSize: 36 }}>🖼️</span>
+                      <span style={{ fontSize: 12, color: COLORS.textSecondary, fontFamily: "'DM Mono', monospace" }}>{post.mediaLabel}</span>
+                    </div>
+                  )}
+
+                  <div style={{ display: "flex", gap: 16, marginTop: 14 }}>
+                    <button onClick={() => toggleLike(post.id)} style={{
+                      display: "flex", alignItems: "center", gap: 6,
+                      background: liked ? COLORS.accentSoft : "transparent",
+                      border: `1px solid ${liked ? COLORS.accent + "44" : COLORS.border}`,
+                      borderRadius: 8, padding: "5px 12px",
+                      color: liked ? COLORS.accent : COLORS.textMuted,
+                      fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+                    }}>
+                      {liked ? "♥" : "♡"} {post.likes.length}
+                    </button>
+                    <button onClick={() => setOpenComment(openComment === post.id ? null : post.id)} style={{
+                      display: "flex", alignItems: "center", gap: 6,
+                      background: "transparent", border: `1px solid ${COLORS.border}`,
+                      borderRadius: 8, padding: "5px 12px",
+                      color: COLORS.textMuted, fontSize: 13, cursor: "pointer",
+                      fontFamily: "'DM Sans', sans-serif",
+                    }}>
+                      ◎ {post.comments.length} Kommentar{post.comments.length !== 1 ? "e" : ""}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {(post.comments.length > 0 || openComment === post.id) && (
+              <div style={{ borderTop: `1px solid ${COLORS.border}`, background: COLORS.bg, padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
+                {post.comments.map(c => {
+                  const cu = USERS.find(u => u.id === c.userId);
+                  return (
+                    <div key={c.id} style={{ display: "flex", gap: 10 }}>
+                      <Avatar user={cu} size={28} />
+                      <div style={{ background: COLORS.surface, borderRadius: 10, padding: "8px 14px", flex: 1, border: `1px solid ${COLORS.border}` }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: cu?.color }}>{cu?.name}</span>
+                        <span style={{ fontSize: 11, color: COLORS.textMuted, marginLeft: 8, fontFamily: "'DM Mono', monospace" }}>{formatTime(c.timestamp)}</span>
+                        <p style={{ margin: "4px 0 0", fontSize: 13, color: COLORS.textPrimary }}>{c.text}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+                {openComment === post.id && (
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <Avatar user={currentUser} size={28} />
+                    <div style={{ flex: 1, display: "flex", gap: 8 }}>
+                      <input
+                        placeholder="Kommentar schreiben…"
+                        value={commentTexts[post.id] || ""}
+                        onChange={e => setCommentTexts(t => ({ ...t, [post.id]: e.target.value }))}
+                        onKeyDown={e => e.key === "Enter" && addComment(post.id)}
+                        style={{
+                          flex: 1, background: COLORS.surface, border: `1px solid ${COLORS.border}`,
+                          borderRadius: 8, padding: "8px 12px", color: COLORS.textPrimary,
+                          fontSize: 13, outline: "none", fontFamily: "'DM Sans', sans-serif",
+                        }}
+                      />
+                      <button onClick={() => addComment(post.id)} style={{
+                        background: COLORS.accent, color: "#fff", border: "none",
+                        borderRadius: 8, padding: "8px 14px", fontSize: 13,
+                        cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+                      }}>→</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── CHAT (NEU) ────────────────────────────────────────────────────────────────
+function Chat({ messages, onSendMessage, currentUser }) {
+  const [text, setText] = useState("");
+  const messagesEndRef = useRef(null);
+
+  function handleSend() {
+    if (!text.trim()) return;
+    onSendMessage(text.trim());
+    setText("");
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 50);
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 72px)", gap: 16 }}>
+      <div>
+        <h1 style={{ fontSize: 26, fontWeight: 800, color: COLORS.textPrimary, margin: 0, letterSpacing: "-0.03em" }}>Team-Chat</h1>
+        <p style={{ color: COLORS.textSecondary, margin: "4px 0 0", fontSize: 14 }}>Direkte Absprache im Team</p>
+      </div>
+
+      <div style={{
+        flex: 1, background: COLORS.surface, borderRadius: 16, border: `1px solid ${COLORS.border}`,
+        padding: 20, overflowY: "auto", display: "flex", flexDirection: "column", gap: 16
+      }}>
+        {messages.map(msg => {
+          const sender = USERS.find(u => u.id === msg.userId);
+          const isMe = msg.userId === currentUser.id;
+          return (
+            <div key={msg.id} style={{
+              display: "flex", gap: 12, flexDirection: isMe ? "row-reverse" : "row",
+              alignItems: "flex-start", alignSelf: isMe ? "flex-end" : "flex-start", maxWidth: "75%"
+            }}>
+              <Avatar user={sender} size={32} />
+              <div>
+                <div style={{
+                  display: "flex", gap: 8, marginBottom: 4,
+                  justifyContent: isMe ? "flex-end" : "flex-start", alignItems: "center"
+                }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: COLORS.textSecondary }}>{sender?.name}</span>
+                  <span style={{ fontSize: 10, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace" }}>
+                    {new Date(msg.timestamp).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                </div>
+                <div style={{
+                  background: isMe ? COLORS.accentSoft : COLORS.bg,
+                  border: `1px solid ${isMe ? COLORS.accent + "44" : COLORS.border}`,
+                  padding: "10px 14px", borderRadius: 12, color: COLORS.textPrimary, fontSize: 14,
+                  lineHeight: 1.5, wordBreak: "break-word"
+                }}>{msg.text}</div>
+              </div>
+            </div>
+          );
+        })}
+        <div ref={messagesEndRef} />
+      </div>
+
+      <div style={{ display: "flex", gap: 10, background: COLORS.surface, padding: 12, borderRadius: 12, border: `1px solid ${COLORS.border}` }}>
+        <input
+          placeholder="Nachricht schreiben..."
+          value={text}
+          onChange={e => setText(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && handleSend()}
+          style={{
+            flex: 1, background: COLORS.bg, border: `1px solid ${COLORS.border}`,
+            borderRadius: 8, padding: "12px 16px", color: COLORS.textPrimary,
+            fontSize: 14, outline: "none", fontFamily: "'DM Sans', sans-serif"
+          }}
+        />
+        <button onClick={handleSend} style={{
+          background: COLORS.accent, color: "#fff", border: "none", borderRadius: 8,
+          padding: "0 20px", fontSize: 14, fontWeight: 600, cursor: "pointer",
+          fontFamily: "'DM Sans', sans-serif"
+        }}>Senden</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── MEDIA ────────────────────────────────────────────────────────────────────
+function Media({ items, setItems, currentUser }) {
+  const [selected, setSelected] = useState(null);
+  const [newComment, setNewComment] = useState("");
+  const fileRef = useRef();
+
+  function toggleLike(id) {
+    setItems(prev => prev.map(item => {
+      if (item.id !== id) return item;
+      const liked = item.likes.includes(currentUser.id);
+      return { ...item, likes: liked ? item.likes.filter(x => x !== currentUser.id) : [...item.likes, currentUser.id] };
+    }));
+    if (selected?.id === id) {
+      setSelected(prev => {
+        const liked = prev.likes.includes(currentUser.id);
+        return { ...prev, likes: liked ? prev.likes.filter(x => x !== currentUser.id) : [...prev.likes, currentUser.id] };
+      });
+    }
+  }
+
+  function addComment() {
+    if (!newComment.trim() || !selected) return;
+    const text = newComment.trim();
+    setItems(prev => prev.map(item => item.id !== selected.id ? item : { ...item, comments: [...item.comments, text] }));
+    setSelected(prev => ({ ...prev, comments: [...prev.comments, text] }));
+    setNewComment("");
+  }
+
+  function handleUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const type = file.type.startsWith("video") ? "video" : "image";
+    const newItem = {
+      id: Date.now(), type, name: file.name, uploader: currentUser.id,
+      bg: COLORS.accentSoft, emoji: type === "video" ? "🎬" : "🖼️",
+      comments: [], likes: [],
+    };
+    setItems(prev => [newItem, ...prev]);
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div>
+          <h1 style={{ fontSize: 26, fontWeight: 800, color: COLORS.textPrimary, margin: 0, letterSpacing: "-0.03em" }}>Medien</h1>
+          <p style={{ color: COLORS.textSecondary, margin: "4px 0 0", fontSize: 14 }}>Bilder & Videos hochladen, teilen und kommentieren</p>
+        </div>
+        <button onClick={() => fileRef.current.click()} style={{
+          background: `linear-gradient(135deg, ${COLORS.accent}, #5a6ff7)`,
+          color: "#fff", border: "none", borderRadius: 10,
+          padding: "10px 20px", fontSize: 13, fontWeight: 600,
+          cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+          boxShadow: `0 4px 14px ${COLORS.accent}44`,
+        }}>+ Hochladen</button>
+        <input ref={fileRef} type="file" accept="image/*,video/*" style={{ display: "none" }} onChange={handleUpload} />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>
+        {items.map(item => {
+          const uploader = USERS.find(u => u.id === item.uploader);
+          const liked = item.likes.includes(currentUser.id);
+          return (
+            <div key={item.id} style={{
+              background: COLORS.surface, borderRadius: 14, border: `1px solid ${COLORS.border}`,
+              overflow: "hidden", cursor: "pointer",
+            }} onClick={() => setSelected(item)}>
+              <div style={{
+                height: 140, background: `linear-gradient(135deg, ${item.bg}, ${COLORS.bg})`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 44,
+              }}>{item.emoji}</div>
+              <div style={{ padding: "12px 14px" }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.textPrimary, marginBottom: 4 }}>{item.name}</div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <Avatar user={uploader} size={20} />
+                    <span style={{ fontSize: 11, color: COLORS.textMuted }}>{uploader?.name.split(" ")[0]}</span>
+                  </div>
+                  <div style={{ display: "flex", gap: 10, fontSize: 11, color: COLORS.textMuted }}>
+                    <span onClick={e => { e.stopPropagation(); toggleLike(item.id); }} style={{ cursor: "pointer", color: liked ? COLORS.accent : COLORS.textMuted }}>
+                      {liked ? "♥" : "♡"} {item.likes.length}
+                    </span>
+                    <span>◎ {item.comments.length}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {selected && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 100,
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+        }} onClick={() => setSelected(null)}>
+          <div style={{
+            background: COLORS.surface, borderRadius: 20, border: `1px solid ${COLORS.border}`,
+            width: "100%", maxWidth: 600, maxHeight: "90vh", overflow: "auto",
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{
+              height: 220, background: `linear-gradient(135deg, ${selected.bg}, ${COLORS.bg})`,
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 64,
+              borderRadius: "20px 20px 0 0",
+            }}>{selected.emoji}</div>
+            <div style={{ padding: 24 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                <div>
+                  <div style={{ fontSize: 17, fontWeight: 700, color: COLORS.textPrimary }}>{selected.name}</div>
+                  <div style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 2 }}>
+                    Hochgeladen von {USERS.find(u => u.id === selected.uploader)?.name}
+                  </div>
+                </div>
+                <button onClick={() => toggleLike(selected.id)} style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  background: selected.likes.includes(currentUser.id) ? COLORS.accentSoft : "transparent",
+                  border: `1px solid ${selected.likes.includes(currentUser.id) ? COLORS.accent + "44" : COLORS.border}`,
+                  borderRadius: 8, padding: "6px 14px",
+                  color: selected.likes.includes(currentUser.id) ? COLORS.accent : COLORS.textMuted,
+                  fontSize: 14, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+                }}>{selected.likes.includes(currentUser.id) ? "♥" : "♡"} {selected.likes.length}</button>
+              </div>
+              <div style={{ borderTop: `1px solid ${COLORS.border}`, paddingTop: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.textSecondary, marginBottom: 12 }}>Kommentare ({selected.comments.length})</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+                  {selected.comments.map((c, i) => (
+                    <div key={i} style={{
+                      background: COLORS.bg, borderRadius: 8, padding: "8px 12px",
+                      fontSize: 13, color: COLORS.textPrimary, border: `1px solid ${COLORS.border}`,
+                    }}>{c}</div>
+                  ))}
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input
+                    placeholder="Kommentar schreiben…"
+                    value={newComment}
+                    onChange={e => setNewComment(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && addComment()}
+                    style={{
+                      flex: 1, background: COLORS.bg, border: `1px solid ${COLORS.border}`,
+                      borderRadius: 8, padding: "8px 12px", color: COLORS.textPrimary,
+                      fontSize: 13, outline: "none", fontFamily: "'DM Sans', sans-serif",
+                    }}
+                  />
+                  <button onClick={addComment} style={{
+                    background: COLORS.accent, color: "#fff", border: "none",
+                    borderRadius: 8, padding: "8px 14px", fontSize: 13,
+                    cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+                  }}>→</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── FILES ────────────────────────────────────────────────────────────────────
+function Files({ files, setFiles, currentUser }) {
+  const fileRef = useRef();
+
+  function handleUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const ext = file.name.split(".").pop().toLowerCase();
+    const typeMap = { pdf: "pdf", zip: "zip", docx: "doc", doc: "doc", xlsx: "xls", xls: "xls", png: "img", jpg: "img", mp4: "vid" };
+    setFiles(prev => [{
+      id: Date.now(), name: file.name,
+      size: file.size > 1024 * 1024 ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : `${(file.size / 1024).toFixed(0)} KB`,
+      type: typeMap[ext] || "pdf", uploadedBy: currentUser.id,
+      date: new Date().toISOString().slice(0, 10),
+    }, ...prev]);
+    e.target.value = "";
+  }
+
+  function deleteFile(id) {
+    setFiles(prev => prev.filter(f => f.id !== id));
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div>
+          <h1 style={{ fontSize: 26, fontWeight: 800, color: COLORS.textPrimary, margin: 0, letterSpacing: "-0.03em" }}>Dateien</h1>
+          <p style={{ color: COLORS.textSecondary, margin: "4px 0 0", fontSize: 14 }}>Dokumente und Ressourcen für das Team</p>
+        </div>
+        <button onClick={() => fileRef.current.click()} style={{
+          background: `linear-gradient(135deg, ${COLORS.accent}, #5a6ff7)`,
+          color: "#fff", border: "none", borderRadius: 10,
+          padding: "10px 20px", fontSize: 13, fontWeight: 600,
+          cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+          boxShadow: `0 4px 14px ${COLORS.accent}44`,
+        }}>+ Hochladen</button>
+        <input ref={fileRef} type="file" style={{ display: "none" }} onChange={handleUpload} />
+      </div>
+
+      <div style={{ background: COLORS.surface, borderRadius: 16, border: `1px solid ${COLORS.border}`, overflow: "hidden" }}>
+        <div style={{
+          display: "grid", gridTemplateColumns: "auto 1fr auto auto auto",
+          gap: "0 16px", padding: "10px 20px",
+          background: COLORS.bg, borderBottom: `1px solid ${COLORS.border}`,
+          fontSize: 11, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace",
+          letterSpacing: "0.06em",
+        }}>
+          <span>TYP</span><span>DATEI</span><span>GRÖSSE</span><span>DATUM</span><span></span>
+        </div>
+        {files.map(file => {
+          const uploader = USERS.find(u => u.id === file.uploadedBy);
+          return (
+            <div key={file.id} style={{
+              display: "grid", gridTemplateColumns: "auto 1fr auto auto auto",
+              gap: "0 16px", padding: "14px 20px", alignItems: "center",
+              borderBottom: `1px solid ${COLORS.border}`,
+              transition: "background 0.15s",
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = COLORS.surfaceHover}
+              onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+            >
+              <FileIcon type={file.type} />
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 500, color: COLORS.textPrimary }}>{file.name}</div>
+                <div style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 2, display: "flex", gap: 6, alignItems: "center" }}>
+                  <Avatar user={uploader} size={16} />
+                  {uploader?.name}
+                </div>
+              </div>
+              <span style={{ fontSize: 12, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap" }}>{file.size}</span>
+              <span style={{ fontSize: 12, color: COLORS.textMuted, fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap" }}>{file.date}</span>
+              <button onClick={() => deleteFile(file.id)} style={{
+                background: "transparent", border: `1px solid ${COLORS.border}`,
+                borderRadius: 6, padding: "4px 8px", color: COLORS.textMuted,
+                fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+              }}>✕</button>
+            </div>
+          );
+        })}
+        {files.length === 0 && (
+          <div style={{ padding: 40, textAlign: "center", color: COLORS.textMuted, fontSize: 14 }}>
+            Noch keine Dateien hochgeladen.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── APP ──────────────────────────────────────────────────────────────────────
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [active, setActive] = useState("dashboard");
+  
+  // Zentralisierter Globaler State
+  const [tasks] = useState(INITIAL_TASKS);
+  const [posts, setPosts] = useState(INITIAL_POSTS);
+  const [mediaItems, setMediaItems] = useState(INITIAL_MEDIA);
+  const [files, setFiles] = useState(INITIAL_FILES);
+  const [chatMessages, setChatMessages] = useState(INITIAL_CHAT);
+
+  function handleSendMessage(text) {
+    const myMessage = {
+      id: Date.now(),
+      userId: user.id,
+      text: text,
+      timestamp: new Date().toISOString()
+    };
+    
+    setChatMessages(prev => [...prev, myMessage]);
+
+    // Bot-Antwort simulieren
+    setTimeout(() => {
+      const randomResponse = BOT_RESPONSES[Math.floor(Math.random() * BOT_RESPONSES.length)];
+      const botMessage = {
+        id: Date.now() + 1,
+        userId: randomResponse.userId,
+        text: randomResponse.text,
+        timestamp: new Date().toISOString()
+      };
+      setChatMessages(prev => [...prev, botMessage]);
+    }, 1500);
+  }
+
+  if (!user) return <LoginPage onLogin={setUser} />;
+
+  return (
+    <div style={{ display: "flex", minHeight: "100vh", background: COLORS.bg, fontFamily: "'DM Sans', sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500;600;700&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        textarea, input { font-family: inherit; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: ${COLORS.bg}; }
+        ::-webkit-scrollbar-thumb { background: ${COLORS.border}; border-radius: 3px; }
+      `}</style>
+      <Sidebar active={active} setActive={setActive} currentUser={user} onLogout={() => setUser(null)} />
+      <main style={{ flex: 1, padding: "36px 40px", overflowY: "auto", maxWidth: 800 }}>
+        {active === "dashboard" && <Dashboard tasks={tasks} />}
+        {active === "feed" && <Feed posts={posts} setPosts={setPosts} currentUser={user} />}
+        {active === "chat" && <Chat messages={chatMessages} onSendMessage={handleSendMessage} currentUser={user} />}
+        {active === "media" && <Media items={mediaItems} setItems={setMediaItems} currentUser={user} />}
+        {active === "files" && <Files files={files} setFiles={setFiles} currentUser={user} />}
+      </main>
+    </div>
+  );
+}
